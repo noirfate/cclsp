@@ -106,6 +106,47 @@ export class LSPClient {
     }
   }
 
+  /**
+   * Resolve a file path, preferring rootDir from the server config if the path is relative.
+   * @param filePath - The file path to resolve (can be relative or absolute)
+   * @returns The absolute file path
+   */
+  public resolveFilePath(filePath: string): string {
+    // Check if filePath is already absolute (Unix: /, Windows: C:\ or UNC paths)
+    const isAbsolutePath =
+      filePath.startsWith('/') || filePath.startsWith('\\') || /^[a-zA-Z]:/.test(filePath);
+    
+    if (isAbsolutePath) {
+      return normalize(filePath);
+    }
+
+    // Path is relative - try to get the server config for this file
+    const serverConfig = this.getServerForFile(filePath);
+    
+    if (serverConfig?.rootDir) {
+      // Use rootDir from server config
+      const normalizedServerRoot = normalize(serverConfig.rootDir);
+      const isRootAbsolute =
+        normalizedServerRoot.startsWith('/') || /^[a-zA-Z]:/.test(normalizedServerRoot);
+      const rootDir = isRootAbsolute
+        ? normalizedServerRoot
+        : join(process.cwd(), normalizedServerRoot);
+      
+      const resolvedPath = normalize(join(rootDir, filePath));
+      process.stderr.write(
+        `Resolved relative path '${filePath}' using rootDir '${serverConfig.rootDir}' -> '${resolvedPath}'\n`
+      );
+      return resolvedPath;
+    }
+
+    // Fallback to cwd if no server config found
+    const resolvedPath = normalize(join(process.cwd(), filePath));
+    process.stderr.write(
+      `Resolved relative path '${filePath}' using cwd -> '${resolvedPath}'\n`
+    );
+    return resolvedPath;
+  }
+
   private getServerForFile(filePath: string): LSPServerConfig | null {
     const extension = filePath.split('.').pop();
     if (!extension) return null;

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { resolve } from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -204,7 +203,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         symbol_name: string;
         symbol_kind?: string;
       };
-      const absolutePath = resolve(file_path);
+      const absolutePath = lspClient.resolveFilePath(file_path);
 
       const result = await lspClient.findSymbolsByName(absolutePath, symbol_name, symbol_kind);
       const { matches: symbolMatches, warning } = result;
@@ -297,7 +296,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         symbol_kind?: string;
         include_declaration?: boolean;
       };
-      const absolutePath = resolve(file_path);
+      const absolutePath = lspClient.resolveFilePath(file_path);
 
       const result = await lspClient.findSymbolsByName(absolutePath, symbol_name, symbol_kind);
       const { matches: symbolMatches, warning } = result;
@@ -385,7 +384,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         new_name: string;
         dry_run?: boolean;
       };
-      const absolutePath = resolve(file_path);
+      const absolutePath = lspClient.resolveFilePath(file_path);
 
       const result = await lspClient.findSymbolsByName(absolutePath, symbol_name, symbol_kind);
       const { matches: symbolMatches, warning } = result;
@@ -528,7 +527,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         new_name: string;
         dry_run?: boolean;
       };
-      const absolutePath = resolve(file_path);
+      const absolutePath = lspClient.resolveFilePath(file_path);
 
       try {
         const workspaceEdit = await lspClient.renameSymbol(
@@ -606,7 +605,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     if (name === 'get_diagnostics') {
       const { file_path } = args as { file_path: string };
-      const absolutePath = resolve(file_path);
+      const absolutePath = lspClient.resolveFilePath(file_path);
 
       try {
         const diagnostics = await lspClient.getDiagnostics(absolutePath);
