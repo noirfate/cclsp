@@ -244,7 +244,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               .join('\n');
 
             results.push(
-              `Results for ${match.name} (${lspClient.symbolKindToString(match.kind)}) at ${file_path}:${match.position.line + 1}:${match.position.character + 1}:\n${locationResults}`
+              `Definition of ${match.name} (${lspClient.symbolKindToString(match.kind)}) at ${file_path}:${match.position.line + 1}:${match.position.character + 1}:\n${locationResults}`
             );
           } else {
             process.stderr.write(
@@ -335,7 +335,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               .join('\n');
 
             results.push(
-              `Results for ${match.name} (${lspClient.symbolKindToString(match.kind)}) at ${file_path}:${match.position.line + 1}:${match.position.character + 1}:\n${locationResults}`
+              `References to ${match.name} (${lspClient.symbolKindToString(match.kind)}) at ${file_path}:${match.position.line + 1}:${match.position.character + 1}:\n${locationResults}`
             );
           }
         } catch (error) {

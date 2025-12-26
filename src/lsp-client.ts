@@ -29,6 +29,17 @@ interface LSPMessage {
   error?: LSPError;
 }
 
+interface ResolvedTimeouts {
+  initialization: number;
+  request: number;
+  diagnostics: {
+    maxWait: number;
+    idle: number;
+    checkInterval: number;
+    trigger: number;
+  };
+}
+
 interface ServerState {
   process: ChildProcess;
   initialized: boolean;
@@ -37,6 +48,7 @@ interface ServerState {
   fileVersions: Map<string, number>; // Track file versions for didChange notifications
   startTime: number;
   config: LSPServerConfig;
+  timeouts: ResolvedTimeouts; // Resolved timeout values with defaults applied at initialization
   restartTimer?: NodeJS.Timeout;
   initializationResolve?: () => void;
   diagnostics: Map<string, Diagnostic[]>; // Store diagnostics by file URI
@@ -240,6 +252,18 @@ export class LSPClient {
       );
     }
 
+    // Resolve timeout configurations with defaults
+    const timeouts: ResolvedTimeouts = {
+      initialization: serverConfig.timeouts?.initialization ?? 60000,
+      request: serverConfig.timeouts?.request ?? 60000,
+      diagnostics: {
+        maxWait: serverConfig.timeouts?.diagnostics?.maxWait ?? 60000,
+        idle: serverConfig.timeouts?.diagnostics?.idle ?? 500,
+        checkInterval: serverConfig.timeouts?.diagnostics?.checkInterval ?? 100,
+        trigger: serverConfig.timeouts?.diagnostics?.trigger ?? 5000,
+      },
+    };
+
     const serverState: ServerState = {
       process: childProcess,
       initialized: false,
@@ -248,6 +272,7 @@ export class LSPClient {
       fileVersions: new Map(),
       startTime: Date.now(),
       config: serverConfig,
+      timeouts,
       restartTimer: undefined,
       diagnostics: new Map(),
       lastDiagnosticUpdate: new Map(),
@@ -382,18 +407,17 @@ export class LSPClient {
       };
     }
 
-    const initResult = await this.sendRequest(childProcess, 'initialize', initializeParams);
+    const initResult = await this.sendRequest(childProcess, 'initialize', initializeParams, timeouts.initialization);
 
     // Send the initialized notification after receiving the initialize response
     await this.sendNotification(childProcess, 'initialized', {});
 
     // Wait for the server to send the initialized notification back with timeout
-    const INITIALIZATION_TIMEOUT = 3000; // 3 seconds
     try {
       await Promise.race([
         initializationPromise,
         new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Initialization timeout')), INITIALIZATION_TIMEOUT)
+          setTimeout(() => reject(new Error('Initialization timeout')), timeouts.initialization)
         ),
       ]);
     } catch (error) {
@@ -867,16 +891,14 @@ export class LSPClient {
     await this.ensureFileOpen(serverState, filePath);
 
     process.stderr.write('[DEBUG findDefinition] Sending textDocument/definition request\n');
-    const method = 'textDocument/definition';
-    const timeout = serverState.adapter?.getTimeout?.(method) ?? 30000;
     const result = await this.sendRequest(
       serverState.process,
-      method,
+      'textDocument/definition',
       {
         textDocument: { uri: pathToUri(filePath) },
         position,
       },
-      timeout
+      serverState.timeouts.request
     );
 
     process.stderr.write(
@@ -931,17 +953,15 @@ export class LSPClient {
       `[DEBUG] findReferences for ${filePath} at ${position.line}:${position.character}, includeDeclaration: ${includeDeclaration}\n`
     );
 
-    const method = 'textDocument/references';
-    const timeout = serverState.adapter?.getTimeout?.(method) ?? 30000;
     const result = await this.sendRequest(
       serverState.process,
-      method,
+      'textDocument/references',
       {
         textDocument: { uri: pathToUri(filePath) },
         position,
         context: { includeDeclaration },
       },
-      timeout
+      serverState.timeouts.request
     );
 
     process.stderr.write(
@@ -988,17 +1008,15 @@ export class LSPClient {
     await this.ensureFileOpen(serverState, filePath);
 
     process.stderr.write('[DEBUG renameSymbol] Sending textDocument/rename request\n');
-    const method = 'textDocument/rename';
-    const timeout = serverState.adapter?.getTimeout?.(method) ?? 30000;
     const result = await this.sendRequest(
       serverState.process,
-      method,
+      'textDocument/rename',
       {
         textDocument: { uri: pathToUri(filePath) },
         position,
         newName,
       },
-      timeout
+      serverState.timeouts.request
     );
 
     process.stderr.write(
@@ -1077,17 +1095,13 @@ export class LSPClient {
 
     process.stderr.write(`[DEBUG] Requesting documentSymbol for: ${filePath}\n`);
 
-    // Get custom timeout from adapter if available
-    const method = 'textDocument/documentSymbol';
-    const timeout = serverState.adapter?.getTimeout?.(method) ?? 30000;
-
     const result = await this.sendRequest(
       serverState.process,
-      method,
+      'textDocument/documentSymbol',
       {
         textDocument: { uri: pathToUri(filePath) },
       },
-      timeout
+      serverState.timeouts.request
     );
 
     process.stderr.write(
@@ -1453,12 +1467,16 @@ export class LSPClient {
     serverState: ServerState,
     fileUri: string,
     options: {
-      maxWaitTime?: number; // Maximum time to wait in ms (default: 1000)
-      idleTime?: number; // Time without updates to consider idle in ms (default: 100)
-      checkInterval?: number; // How often to check for updates in ms (default: 50)
+      maxWaitTime?: number; // Maximum time to wait in ms
+      idleTime?: number; // Time without updates to consider idle in ms
+      checkInterval?: number; // How often to check for updates in ms
     } = {}
   ): Promise<void> {
-    const { maxWaitTime = 1000, idleTime = 100, checkInterval = 50 } = options;
+    const { 
+      maxWaitTime = serverState.timeouts.diagnostics.maxWait, 
+      idleTime = serverState.timeouts.diagnostics.idle, 
+      checkInterval = serverState.timeouts.diagnostics.checkInterval
+    } = options;
 
     const startTime = Date.now();
     let lastVersion = serverState.diagnosticVersions.get(fileUri) ?? -1;
@@ -1529,7 +1547,7 @@ export class LSPClient {
     try {
       const result = await this.sendRequest(serverState.process, 'textDocument/diagnostic', {
         textDocument: { uri: fileUri },
-      });
+      }, serverState.timeouts.request);
 
       process.stderr.write(
         `[DEBUG getDiagnostics] Result type: ${typeof result}, has kind: ${result && typeof result === 'object' && 'kind' in result}\n`
@@ -1563,10 +1581,7 @@ export class LSPClient {
 
       // Wait for the server to become idle and publish diagnostics
       // MCP tools can afford longer wait times for better reliability
-      await this.waitForDiagnosticsIdle(serverState, fileUri, {
-        maxWaitTime: 5000, // 5 seconds - generous timeout for MCP usage
-        idleTime: 300, // 300ms idle time to ensure all diagnostics are received
-      });
+      await this.waitForDiagnosticsIdle(serverState, fileUri);
 
       // Check again for cached diagnostics
       const diagnosticsAfterWait = serverState.diagnostics.get(fileUri);
@@ -1622,8 +1637,7 @@ export class LSPClient {
         // Wait for the server to process the changes and become idle
         // After making changes, servers may need time to re-analyze
         await this.waitForDiagnosticsIdle(serverState, fileUri, {
-          maxWaitTime: 3000, // 3 seconds after triggering changes
-          idleTime: 300, // Consistent idle time for reliability
+          maxWaitTime: serverState.timeouts.diagnostics.trigger,
         });
 
         // Check one more time

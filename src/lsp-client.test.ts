@@ -13,6 +13,18 @@ type LSPClientInternal = {
   sendRequest: (method: string, params: unknown) => Promise<unknown>;
 };
 
+// Helper function to create default timeouts for tests
+const createDefaultTimeouts = () => ({
+  initialization: 3000,
+  request: 30000,
+  diagnostics: {
+    maxWait: 5000,
+    idle: 300,
+    checkInterval: 50,
+    trigger: 3000,
+  },
+});
+
 const TEST_DIR = process.env.RUNNER_TEMP
   ? `${process.env.RUNNER_TEMP}/cclsp-test`
   : '/tmp/cclsp-test';
@@ -203,6 +215,7 @@ describe('LSPClient', () => {
         initialized: false,
         openFiles: new Set(),
         diagnostics: new Map(),
+        timeouts: createDefaultTimeouts(),
         lastDiagnosticUpdate: new Map(),
         diagnosticVersions: new Map(),
       };
@@ -262,6 +275,7 @@ describe('LSPClient', () => {
         openFiles: new Set(),
         diagnostics: new Map(),
         lastDiagnosticUpdate: new Map(),
+        timeouts: createDefaultTimeouts(),
         diagnosticVersions: new Map(),
       };
 
@@ -462,6 +476,7 @@ describe('LSPClient', () => {
           restartInterval: 0.1, // 0.1 minutes
         },
         restartTimer: undefined,
+        timeouts: createDefaultTimeouts(),
       };
 
       try {
@@ -494,6 +509,7 @@ describe('LSPClient', () => {
           // No restartInterval
         },
         restartTimer: undefined,
+        timeouts: createDefaultTimeouts(),
       };
 
       try {
@@ -515,7 +531,8 @@ describe('LSPClient', () => {
       const mockServerState = {
         process: { kill: jest.fn() },
         restartTimer: mockTimer,
-      };
+        timeouts: createDefaultTimeouts(),
+      } as any;
 
       // Mock servers map to include our test server state
       const serversMap = new Map();
@@ -565,7 +582,8 @@ describe('LSPClient', () => {
           command: ['typescript-language-server', '--stdio'],
         },
         restartTimer: undefined,
-      };
+        timeouts: createDefaultTimeouts(),
+      } as any;
 
       const serversMap = new Map();
       serversMap.set(JSON.stringify(mockServerState.config), mockServerState);
@@ -714,7 +732,8 @@ describe('LSPClient', () => {
           command: ['typescript-language-server', '--stdio'],
         },
         restartTimer: mockTimer,
-      };
+        timeouts: createDefaultTimeouts(),
+      } as any;
 
       const serversMap = new Map();
       serversMap.set(JSON.stringify(mockServerState.config), mockServerState);
@@ -775,6 +794,7 @@ describe('LSPClient', () => {
         diagnostics: new Map(),
         lastDiagnosticUpdate: new Map(),
         diagnosticVersions: new Map(),
+        timeouts: createDefaultTimeouts(),
       };
 
       const getServerSpy = spyOn(
@@ -803,7 +823,8 @@ describe('LSPClient', () => {
         'textDocument/diagnostic',
         {
           textDocument: { uri: pathToUri('/test.ts') },
-        }
+        },
+        30000 // default timeout
       );
 
       getServerSpy.mockRestore();
@@ -822,6 +843,7 @@ describe('LSPClient', () => {
         diagnostics: new Map(),
         lastDiagnosticUpdate: new Map(),
         diagnosticVersions: new Map(),
+        timeouts: createDefaultTimeouts(),
       };
 
       const getServerSpy = spyOn(
@@ -871,6 +893,7 @@ describe('LSPClient', () => {
         initialized: true,
         openFiles: new Set(),
         diagnostics: new Map([[pathToUri('/test.ts'), mockDiagnostics]]),
+        timeouts: createDefaultTimeouts(),
       };
 
       const getServerSpy = spyOn(
@@ -906,6 +929,7 @@ describe('LSPClient', () => {
         diagnostics: new Map(),
         lastDiagnosticUpdate: new Map(),
         diagnosticVersions: new Map(),
+        timeouts: createDefaultTimeouts(),
       };
 
       const getServerSpy = spyOn(
@@ -949,6 +973,7 @@ describe('LSPClient', () => {
         diagnostics: new Map(),
         lastDiagnosticUpdate: new Map(),
         diagnosticVersions: new Map(),
+        timeouts: createDefaultTimeouts(),
       };
 
       const getServerSpy = spyOn(

@@ -13,7 +13,17 @@
         "typescript-language-server",
         "--stdio"
       ],
-      "rootDir": "."
+      "rootDir": ".",
+      "timeouts": {
+        "initialization": 3000,
+        "request": 30000,
+        "diagnostics": {
+          "maxWait": 5000,
+          "idle": 300,
+          "checkInterval": 50,
+          "trigger": 3000
+        }
+      }
     },
     {
       "extensions": [
@@ -22,7 +32,17 @@
       "command": [
         "gopls"
       ],
-      "rootDir": "."
+      "rootDir": ".",
+      "timeouts": {
+        "initialization": 5000,
+        "request": 60000,
+        "diagnostics": {
+          "maxWait": 8000,
+          "idle": 500,
+          "checkInterval": 100,
+          "trigger": 5000
+        }
+      }
     }
   ]
 }

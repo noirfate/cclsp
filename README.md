@@ -297,8 +297,18 @@ Alternatively, create an `cclsp.json` configuration file manually:
 - `rootDir`: Working directory for the LSP server (optional, defaults to ".")
 - `restartInterval`: Auto-restart interval in minutes (optional)
 - `initializationOptions`: LSP server initialization options (optional)
+- `timeouts`: Timeout configurations for various LSP operations (optional)
+  - `initialization`: Timeout for server initialization in milliseconds (default: 3000)
+  - `request`: Default timeout for LSP requests in milliseconds (default: 30000)
+  - `diagnostics`: Diagnostic-specific timeout settings
+    - `maxWait`: Maximum time to wait for diagnostics in milliseconds (default: 5000)
+    - `idle`: Idle time to consider diagnostics complete in milliseconds (default: 300)
+    - `checkInterval`: Interval to check diagnostic updates in milliseconds (default: 50)
+    - `trigger`: Timeout after triggering diagnostics in milliseconds (default: 3000)
 
 The `initializationOptions` field allows you to customize how each LSP server initializes. This is particularly useful for servers like `pylsp` (Python) that have extensive plugin configurations, or servers like `devsense-php-ls` that require specific settings.
+
+The `timeouts` field allows you to customize timeout values for different LSP operations. This is particularly useful for slower LSP servers (like `gopls` for large Go projects) that may need more time to respond. If not specified, sensible defaults are used. You can configure different timeout values per server to match their performance characteristics.
 
 <details>
 <summary>📋 More Language Server Examples</summary>
@@ -309,12 +319,26 @@ The `initializationOptions` field allows you to customize how each LSP server in
     {
       "extensions": ["go"],
       "command": ["gopls"],
-      "rootDir": "."
+      "rootDir": ".",
+      "timeouts": {
+        "initialization": 5000,
+        "request": 60000,
+        "diagnostics": {
+          "maxWait": 8000,
+          "idle": 500,
+          "checkInterval": 100,
+          "trigger": 5000
+        }
+      }
     },
     {
       "extensions": ["rs"],
       "command": ["rust-analyzer"],
-      "rootDir": "."
+      "rootDir": ".",
+      "timeouts": {
+        "initialization": 10000,
+        "request": 45000
+      }
     },
     {
       "extensions": ["c", "cpp", "cc", "h", "hpp"],
@@ -324,7 +348,11 @@ The `initializationOptions` field allows you to customize how each LSP server in
     {
       "extensions": ["java"],
       "command": ["jdtls"],
-      "rootDir": "."
+      "rootDir": ".",
+      "timeouts": {
+        "initialization": 15000,
+        "request": 60000
+      }
     },
     {
       "extensions": ["rb"],
@@ -349,6 +377,11 @@ The `initializationOptions` field allows you to customize how each LSP server in
   ]
 }
 ```
+
+**Note**: The example above shows how different LSP servers can have different timeout configurations. For example:
+- `gopls` (Go) uses longer timeouts because it may need more time for large codebases
+- `rust-analyzer` uses custom initialization and request timeouts but relies on default diagnostics settings
+- Other servers use the default timeout values
 
 </details>
 

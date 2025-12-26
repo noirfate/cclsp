@@ -4,6 +4,16 @@ export interface LSPServerConfig {
   rootDir?: string;
   restartInterval?: number; // in minutes, optional auto-restart interval
   initializationOptions?: unknown; // LSP initialization options
+  timeouts?: {
+    initialization?: number; // timeout for initialization in ms (default: 3000)
+    request?: number; // default timeout for LSP requests in ms (default: 30000)
+    diagnostics?: {
+      maxWait?: number; // maximum time to wait for diagnostics in ms (default: 5000)
+      idle?: number; // idle time to consider diagnostics complete in ms (default: 300)
+      checkInterval?: number; // interval to check diagnostic updates in ms (default: 50)
+      trigger?: number; // timeout after triggering diagnostics in ms (default: 3000)
+    };
+  };
 }
 
 export interface Config {
